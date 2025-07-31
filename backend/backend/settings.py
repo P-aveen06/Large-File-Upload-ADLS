@@ -137,16 +137,20 @@ CORS_ALLOWED_ORIGINS = [
 
 # Azure Storage Account URL - the base URL for your storage account
 # Format: https://<storage_account_name>.blob.core.windows.net
-AZURE_STORAGE_ACCOUNT_URL = ""
+# AZURE_STORAGE_ACCOUNT_URL = ""
 
-# Azure Storage SAS Token - provides time-limited access to storage resources
-# Should include permissions for reading, writing, and creating blobs
-# Format: ?sv=2021-06-08&ss=b&srt=sco&sp=rwdlacupx&se=...
-AZURE_STORAGE_SAS_TOKEN = ""
+# # Azure Storage SAS Token - provides time-limited access to storage resources
+# # Should include permissions for reading, writing, and creating blobs
+# # Format: ?sv=2021-06-08&ss=b&srt=sco&sp=rwdlacupx&se=...
+# AZURE_STORAGE_SAS_TOKEN = ""
 
-# Azure Container Name - the blob container where files will be stored
-# Container must exist in the storage account before uploading
-AZURE_CONTAINER_NAME = ""
+# # Azure Container Name - the blob container where files will be stored
+# # Container must exist in the storage account before uploading
+# AZURE_CONTAINER_NAME = ""
+
+AZURE_STORAGE_ACCOUNT_URL = "https://pmrsstorage.blob.core.windows.net"
+AZURE_STORAGE_SAS_TOKEN = "sp=rw&st=2025-07-31T10:28:29Z&se=2025-08-01T15:30:29Z&spr=https&sv=2024-11-04&sr=c&sig=jf8ViOPSl%2FIEN87sJAk%2FIOy4%2B%2F41LW1CGcSpbMBwUmc%3D"
+AZURE_CONTAINER_NAME = "large-file-upload"
 
 # Chunk Size Configuration
 # Defines the size of each chunk for large file uploads (10MB)
