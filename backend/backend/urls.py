@@ -17,7 +17,26 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+"""
+Main URL Configuration
+
+This is the root URL configuration for the Django project.
+It defines the main routing structure:
+
+- /admin/: Django admin interface for database management
+- /api/: RESTful API endpoints for file upload functionality
+
+The API endpoints are delegated to the upload app's URL configuration,
+which handles the chunked file upload system with Azure Blob Storage.
+"""
+
 urlpatterns = [
+    # Django admin interface - accessible at /admin/
+    # Provides web-based interface for managing database records
     path('admin/', admin.site.urls),
+    
+    # API endpoints - accessible at /api/
+    # Delegates to upload app URLs for chunked file upload functionality
+    # Includes: /api/stage/ and /api/commit/ endpoints
     path('api/', include('upload.urls')),
 ]

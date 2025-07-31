@@ -37,15 +37,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',
-    'corsheaders',
-    'upload',
+    'rest_framework',  # Django REST Framework for API functionality
+    'corsheaders',     # CORS headers middleware for cross-origin requests
+    'upload',          # Custom app for handling file uploads to Azure Storage
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Must be placed high in middleware stack
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -125,12 +125,32 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# CORS Configuration
+# Allows cross-origin requests from the React frontend
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
+    "http://localhost:3000",  # React development server default port
 ]
 
-# Azure Storage Settings
+# Azure Storage Configuration
+# These settings are required for uploading files to Azure Blob Storage
+# In production, these should be set via environment variables for security
+
+# Azure Storage Account URL - the base URL for your storage account
+# Format: https://<storage_account_name>.blob.core.windows.net
 AZURE_STORAGE_ACCOUNT_URL = ""
+
+# Azure Storage SAS Token - provides time-limited access to storage resources
+# Should include permissions for reading, writing, and creating blobs
+# Format: ?sv=2021-06-08&ss=b&srt=sco&sp=rwdlacupx&se=...
 AZURE_STORAGE_SAS_TOKEN = ""
+
+# Azure Container Name - the blob container where files will be stored
+# Container must exist in the storage account before uploading
 AZURE_CONTAINER_NAME = ""
+
+# Chunk Size Configuration
+# Defines the size of each chunk for large file uploads (10MB)
+# This should match the CHUNK_SIZE constant in the frontend
+# Larger chunks = fewer HTTP requests but more memory usage
+# Smaller chunks = more HTTP requests but better progress granularity
 CHUNK_SIZE = 10 * 1024 * 1024 # 10 MB
