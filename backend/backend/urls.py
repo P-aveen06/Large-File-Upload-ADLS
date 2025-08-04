@@ -39,4 +39,5 @@ urlpatterns = [
     # Delegates to upload app URLs for chunked file upload functionality
     # Includes: /api/stage/ and /api/commit/ endpoints
     path('api/', include('upload.urls')),
+    path('files/', include('rest_framework_tus.urls')),
 ]
