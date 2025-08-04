@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',  # Django REST Framework for API functionality
     'corsheaders',     # CORS headers middleware for cross-origin requests
+    'rest_framework_tus',  # TUS protocol for resumable file uploads
     'upload',          # Custom app for handling file uploads to Azure Storage
 ]
 
@@ -137,16 +138,16 @@ CORS_ALLOWED_ORIGINS = [
 
 # Azure Storage Account URL - the base URL for your storage account
 # Format: https://<storage_account_name>.blob.core.windows.net
-AZURE_STORAGE_ACCOUNT_URL = ""
+AZURE_STORAGE_ACCOUNT_URL = "https://pmrsstorage.blob.core.windows.net"
 
 # Azure Storage SAS Token - provides time-limited access to storage resources
 # Should include permissions for reading, writing, and creating blobs
 # Format: ?sv=2021-06-08&ss=b&srt=sco&sp=rwdlacupx&se=...
-AZURE_STORAGE_SAS_TOKEN = ""
+AZURE_STORAGE_SAS_TOKEN = "sp=rw&st=2025-07-31T01:29:55Z&se=2025-07-31T09:44:55Z&spr=https&sv=2024-11-04&sr=c&sig=yUNaqFkPlhRNR2XfvkR0GVcddpiLXwFicnR0RHfXdIk%3D"
 
 # Azure Container Name - the blob container where files will be stored
 # Container must exist in the storage account before uploading
-AZURE_CONTAINER_NAME = ""
+AZURE_CONTAINER_NAME = "large-file-upload"
 
 # Chunk Size Configuration
 # Defines the size of each chunk for large file uploads (10MB)
@@ -154,3 +155,8 @@ AZURE_CONTAINER_NAME = ""
 # Larger chunks = fewer HTTP requests but more memory usage
 # Smaller chunks = more HTTP requests but better progress granularity
 CHUNK_SIZE = 10 * 1024 * 1024 # 10 MB
+
+# TUS Configuration for resumable uploads
+TUS_UPLOAD_DIR = BASE_DIR / 'tus_uploads'
+TUS_FILE_HANDLER = 'upload.tus_handlers.AzureBlobTusUploadHandler'
+TUS_DESTINATION_DIR = BASE_DIR / 'tus_uploads'

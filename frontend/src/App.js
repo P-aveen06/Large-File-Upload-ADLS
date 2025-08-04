@@ -1,169 +1,178 @@
-// React imports for component functionality and hooks
-import React, { useCallback, useState, useEffect } from 'react';
-// Drag and drop file upload library
-import { useDropzone } from 'react-dropzone';
-// HTTP client for API requests
-import axios from 'axios';
-// UUID generator for unique block identifiers
-import { v4 as uuidv4 } from 'uuid';
+import React, { useState, useCallback } from 'react';
+import * as tus from 'tus-js-client';
 
-// Configuration: Chunk size for file splitting (10MB chunks for optimal upload performance)
-const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB
-
-/**
- * Main App Component - Large File Upload with Chunking
- * 
- * This component provides a drag-and-drop interface for uploading large files
- * to Azure Blob Storage using a chunked upload strategy. Files are split into
- * smaller chunks, uploaded in parallel, and then committed as a single blob.
- * 
- * Features:
- * - Drag and drop file selection
- * - Chunked upload for large files
- * - Real-time progress tracking
- * - Error handling and user feedback
- * - Parallel chunk upload for better performance
- */
 function App() {
-  // State management for upload progress and status
-  const [uploadProgress, setUploadProgress] = useState(0); // Progress percentage (0-100)
-  const [error, setError] = useState(null); // Error message display
-  const [isUploading, setIsUploading] = useState(false); // Upload status flag
-  const [chunksUploaded, setChunksUploaded] = useState(0); // Number of chunks successfully uploaded
-  const [totalChunks, setTotalChunks] = useState(0); // Total number of chunks for current file
+  const [files, setFiles] = useState([]);
+  const [uploads, setUploads] = useState({});
 
-  /**
-   * Effect hook to calculate and update upload progress
-   * Recalculates progress percentage whenever chunks are uploaded
-   */
-  useEffect(() => {
-    if (totalChunks > 0) {
-      setUploadProgress((chunksUploaded / totalChunks) * 100);
-    }
-  }, [chunksUploaded, totalChunks]);
+  const handleFileSelect = (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    const newFiles = selectedFiles.map(file => ({
+      id: Date.now() + Math.random(),
+      file,
+      progress: 0,
+      status: 'ready', // ready, uploading, paused, completed, error
+      upload: null
+    }));
+    setFiles(prev => [...prev, ...newFiles]);
+  };
 
-  /**
-   * File drop handler - Main upload logic
-   * 
-   * This function handles the entire chunked upload process:
-   * 1. Splits the file into chunks of CHUNK_SIZE
-   * 2. Generates unique block IDs for each chunk
-   * 3. Uploads all chunks in parallel to the staging endpoint
-   * 4. Commits all chunks as a single blob
-   * 
-   * @param {File[]} acceptedFiles - Array of files dropped by user
-   */
-  const onDrop = useCallback(async (acceptedFiles) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
+  const startUpload = useCallback((fileObj) => {
+    const upload = new tus.Upload(fileObj.file, {
+      endpoint: 'http://localhost:8000/files/',
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      metadata: {
+        filename: fileObj.file.name,
+        filetype: fileObj.file.type,
+      },
+      onError: (error) => {
+        console.error('Upload failed:', error);
+        setFiles(prev => prev.map(f => 
+          f.id === fileObj.id 
+            ? { ...f, status: 'error' }
+            : f
+        ));
+      },
+      onProgress: (bytesUploaded, bytesTotal) => {
+        const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
+        setFiles(prev => prev.map(f => 
+          f.id === fileObj.id 
+            ? { ...f, progress: percentage, status: 'uploading' }
+            : f
+        ));
+      },
+      onSuccess: () => {
+        console.log('Upload completed successfully');
+        setFiles(prev => prev.map(f => 
+          f.id === fileObj.id 
+            ? { ...f, status: 'completed', progress: 100 }
+            : f
+        ));
+      }
+    });
 
-    // Initialize upload state
-    setIsUploading(true);
-    setUploadProgress(0);
-    setError(null);
-    setChunksUploaded(0);
+    // Store upload instance for pause/resume functionality
+    setUploads(prev => ({ ...prev, [fileObj.id]: upload }));
+    setFiles(prev => prev.map(f => 
+      f.id === fileObj.id 
+        ? { ...f, upload, status: 'uploading' }
+        : f
+    ));
 
-    // Calculate number of chunks needed based on file size
-    const numChunks = Math.ceil(file.size / CHUNK_SIZE);
-    setTotalChunks(numChunks);
-    
-    // Arrays to store block IDs and upload promises for parallel processing
-    const blockIds = [];
-    const uploadPromises = [];
-
-    // Create and upload each chunk
-    for (let i = 0; i < numChunks; i++) {
-      // Calculate chunk boundaries
-      const start = i * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, file.size);
-      const chunk = file.slice(start, end);
-      
-      // Generate unique base64-encoded block ID for Azure Blob Storage
-      const blockId = btoa(uuidv4());
-      blockIds.push(blockId);
-
-      // Prepare form data for chunk upload
-      const formData = new FormData();
-      formData.append('file', chunk);
-      formData.append('block_id', blockId);
-      formData.append('filename', file.name);
-
-      // Create upload promise for this chunk
-      const promise = axios.post('http://localhost:8000/api/stage/', formData)
-        .then(() => {
-          // Update progress counter when chunk upload completes
-          setChunksUploaded(prev => prev + 1);
-        });
-      uploadPromises.push(promise);
-    }
-
-    try {
-      // Wait for all chunks to upload in parallel
-      await Promise.all(uploadPromises);
-
-      // Prepare commit data with all block IDs
-      const commitData = {
-        filename: file.name,
-        block_ids: blockIds,
-      };
-      
-      // Commit all chunks as a single blob in Azure Storage
-      await axios.post('http://localhost:8000/api/commit/', commitData);
-      
-      console.log('File uploaded successfully');
-    } catch (err) {
-      // Handle upload errors
-      console.error('Error uploading file: ', err);
-      setError('Error uploading file. Please try again.');
-    } finally {
-      // Reset upload state regardless of success or failure
-      setIsUploading(false);
-      setTotalChunks(0);
-      setChunksUploaded(0);
-    }
+    upload.start();
   }, []);
 
-  // Configure dropzone with upload handler and disable during upload
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
-    onDrop, 
-    disabled: isUploading 
-  });
+  const pauseUpload = (fileObj) => {
+    if (uploads[fileObj.id]) {
+      uploads[fileObj.id].abort();
+      setFiles(prev => prev.map(f => 
+        f.id === fileObj.id 
+          ? { ...f, status: 'paused' }
+          : f
+      ));
+    }
+  };
+
+  const resumeUpload = (fileObj) => {
+    if (uploads[fileObj.id]) {
+      uploads[fileObj.id].start();
+      setFiles(prev => prev.map(f => 
+        f.id === fileObj.id 
+          ? { ...f, status: 'uploading' }
+          : f
+      ));
+    }
+  };
+
+  const removeFile = (fileId) => {
+    if (uploads[fileId]) {
+      uploads[fileId].abort();
+    }
+    setFiles(prev => prev.filter(f => f.id !== fileId));
+    setUploads(prev => {
+      const newUploads = { ...prev };
+      delete newUploads[fileId];
+      return newUploads;
+    });
+  };
 
   return (
-    <div>
-      {/* File drop zone with visual feedback */}
-      <div 
-        {...getRootProps()} 
-        style={{ 
-          border: '2px dashed #0087F7', 
-          borderRadius: '5px', 
-          padding: '20px', 
-          textAlign: 'center', 
-          cursor: isUploading ? 'not-allowed' : 'pointer' 
-        }}
-      >
-        <input {...getInputProps()} />
-        {
-          isUploading ?
-            <p>Uploading...</p> :
-            (isDragActive ?
-              <p>Drop the files here ...</p> :
-              <p>Drag 'n' drop a file here, or click to select a file</p>)
-        }
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <h1>Resumable File Upload to Azure Blob Storage</h1>
+      
+      <div style={{ marginBottom: '20px' }}>
+        <input
+          type="file"
+          multiple
+          onChange={handleFileSelect}
+          style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}
+        />
       </div>
-      
-      {/* Progress bar - shown only during upload */}
-      {isUploading && (
-        <div style={{ marginTop: '20px' }}>
-          <progress value={uploadProgress} max="100" style={{ width: '100%' }} />
-          <p>{Math.round(uploadProgress)}%</p>
-        </div>
-      )}
-      
-      {/* Error message display */}
-      {error && (
-        <div style={{ marginTop: '20px', color: 'red' }}>
-          <p>{error}</p>
+
+      {files.length > 0 && (
+        <div>
+          <h2>Files ({files.length})</h2>
+          {files.map(fileObj => (
+            <div
+              key={fileObj.id}
+              style={{
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '15px',
+                marginBottom: '10px',
+                backgroundColor: '#f9f9f9'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <strong>{fileObj.file.name}</strong>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    {(fileObj.file.size / (1024 * 1024)).toFixed(2)} MB
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {fileObj.status === 'ready' && (
+                    <button onClick={() => startUpload(fileObj)} style={{ padding: '5px 10px' }}>
+                      Start
+                    </button>
+                  )}
+                  {fileObj.status === 'uploading' && (
+                    <button onClick={() => pauseUpload(fileObj)} style={{ padding: '5px 10px' }}>
+                      Pause
+                    </button>
+                  )}
+                  {fileObj.status === 'paused' && (
+                    <button onClick={() => resumeUpload(fileObj)} style={{ padding: '5px 10px' }}>
+                      Resume
+                    </button>
+                  )}
+                  <button onClick={() => removeFile(fileObj.id)} style={{ padding: '5px 10px', backgroundColor: '#ff4444', color: 'white' }}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+              
+              {fileObj.status !== 'ready' && (
+                <div style={{ marginTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                    <span>Status: {fileObj.status}</span>
+                    <span>{fileObj.progress}%</span>
+                  </div>
+                  <div style={{ width: '100%', backgroundColor: '#e0e0e0', borderRadius: '4px', marginTop: '5px' }}>
+                    <div
+                      style={{
+                        width: `${fileObj.progress}%`,
+                        backgroundColor: fileObj.status === 'completed' ? '#4CAF50' : '#2196F3',
+                        height: '8px',
+                        borderRadius: '4px',
+                        transition: 'width 0.3s ease'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
