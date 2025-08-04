@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from corsheaders.defaults import default_headers, default_methods
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -131,6 +132,26 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React development server default port
 ]
+
+CORS_ALLOW_METHODS = list(default_methods) + [
+    'PATCH',
+]
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'Tus-Resumable',
+    'Upload-Length',
+    'Upload-Offset',
+    'Upload-Metadata',
+    'Location'
+]
+
+CORS_EXPOSE_HEADERS = [
+    'Tus-Resumable',
+    'Upload-Offset',
+    'Location',
+]
+
+
 
 # Azure Storage Configuration
 # These settings are required for uploading files to Azure Blob Storage
